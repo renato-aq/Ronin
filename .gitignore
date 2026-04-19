@@ -1,0 +1,32 @@
+# Xcode user data
+xcuserdata/
+*.xcuserstate
+
+# Build products
+DerivedData/
+build/
+.build/
+
+# Swift Package Manager
+Package.resolved
+
+# CocoaPods / Carthage / fastlane artifacts
+Pods/
+Carthage/Build/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Environment and secrets
+.env
+.env.*
+*.mobileprovision
+*.p12
+*.cer
+*.pem
+*.key
+*.p8
+
+# macOS
+.DS_Store
