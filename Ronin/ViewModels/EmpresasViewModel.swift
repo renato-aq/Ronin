@@ -14,8 +14,10 @@ final class EmpresasViewModel {
     var rows: [EmpresaRowData] = []
     var empresaEmEdicao: Empresa?
     var isShowingCreateSheet = false
+    var hasEmpresa = false
 
     func update(empresas: [Empresa]) {
+        hasEmpresa = !empresas.isEmpty
         rows = empresas.map { empresa in
             EmpresaRowData(
                 id: empresa.id,
@@ -28,6 +30,7 @@ final class EmpresasViewModel {
     }
 
     func abrirCriacao() {
+        guard !hasEmpresa else { return }
         isShowingCreateSheet = true
     }
 

@@ -1,6 +1,23 @@
 import Foundation
 import SwiftData
 
+enum PontoTrackingError: LocalizedError {
+    case duplicateDayRecord
+    case invalidEventSequence
+    case invalidChronologicalOrder(message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .duplicateDayRecord:
+            return "Já existe um registro para este dia."
+        case .invalidEventSequence:
+            return "Este ponto não pode ser registrado novamente ou o dia já está completo."
+        case let .invalidChronologicalOrder(message):
+            return message
+        }
+    }
+}
+
 struct PontoTrackingService {
     func totalMesAtual(
         from pontos: [PontoDiario],
@@ -19,6 +36,18 @@ struct PontoTrackingService {
     ) -> PontoDiario? {
         let startOfDay = calendar.startOfDay(for: now)
         return pontos.first { calendar.startOfDay(for: $0.dataReferencia) == startOfDay }
+    }
+
+    func hasRegistro(
+        on date: Date,
+        in pontos: [PontoDiario],
+        excluding pontoID: UUID? = nil,
+        calendar: Calendar = .current
+    ) -> Bool {
+        let startOfDay = calendar.startOfDay(for: date)
+        return pontos.contains {
+            calendar.startOfDay(for: $0.dataReferencia) == startOfDay && $0.id != pontoID
+        }
     }
 
     @discardableResult
@@ -49,6 +78,10 @@ struct PontoTrackingService {
             ponto.valorHoraAplicado = empresa.valorHoraAtual
         }
 
+        guard ponto.proximoEventoPermitido == evento else {
+            throw PontoTrackingError.invalidEventSequence
+        }
+
         switch evento {
         case .entrada where ponto.entrada == nil:
             ponto.entrada = now
@@ -59,11 +92,10 @@ struct PontoTrackingService {
         case .fimExpediente where ponto.entrada != nil && ponto.fimExpediente == nil:
             ponto.fimExpediente = now
         default:
-            break
+            throw PontoTrackingError.invalidEventSequence
         }
 
         try modelContext.save()
         return ponto
     }
 }
-,

@@ -2,8 +2,11 @@ import SwiftData
 import SwiftUI
 
 struct PontoDetailView: View {
+    @AppStorage(PrivacyMode.appStorageKey) private var isPrivacyEnabled = false
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: PontoDetailViewModel
+    @State private var errorMessage: String?
 
     init(ponto: PontoDiario) {
         _viewModel = State(initialValue: PontoDetailViewModel(ponto: ponto))
@@ -12,11 +15,18 @@ struct PontoDetailView: View {
     var body: some View {
         Form {
             Section("Resumo") {
-                labeledText("Data", viewModel.dataFormatada)
+                DatePicker(
+                    "Data",
+                    selection: Binding(
+                        get: { viewModel.draftDataReferencia },
+                        set: { viewModel.draftDataReferencia = $0 }
+                    ),
+                    displayedComponents: [.date]
+                )
                 labeledText("Empresa", viewModel.nomeEmpresa)
-                labeledText("Valor/hora aplicado", viewModel.valorHoraAplicadoFormatado)
+                labeledText("Valor/hora aplicado", PrivacyMode.display(viewModel.valorHoraAplicadoFormatado, isEnabled: isPrivacyEnabled))
                 labeledText("Horas calculadas", viewModel.horasCalculadas)
-                labeledText("Faturado no dia", viewModel.valorFaturadoFormatado)
+                labeledText("Faturado no dia", PrivacyMode.display(viewModel.valorFaturadoFormatado, isEnabled: isPrivacyEnabled))
             }
 
             Section("Horários") {
@@ -46,17 +56,54 @@ struct PontoDetailView: View {
                 )
             }
         }
-        .navigationTitle("Detalhe do Dia")
+        .navigationTitle(viewModel.navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if viewModel.isNew {
+                    Button("Cancelar") {
+                        dismiss()
+                    }
+                } else {
+                    PrivacyToolbarButton()
+                }
+            }
+            ToolbarItem(placement: .principal) {
+                if viewModel.isNew {
+                    EmptyView()
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if viewModel.isNew {
+                    PrivacyToolbarButton()
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Salvar") {
                     do {
                         try viewModel.salvar(using: modelContext)
+                        if viewModel.isNew {
+                            dismiss()
+                        }
                     } catch {
+                        errorMessage = (error as? LocalizedError)?.errorDescription ?? "Não foi possível salvar o registro."
                     }
                 }
             }
+        }
+        .alert("Atenção", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    errorMessage = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                errorMessage = nil
+            }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 

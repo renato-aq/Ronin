@@ -2,15 +2,12 @@ import SwiftData
 import SwiftUI
 
 struct DashboardView: View {
+    @AppStorage(PrivacyMode.appStorageKey) private var isPrivacyEnabled = false
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Empresa.nome) private var empresas: [Empresa]
     @Query(sort: \PontoDiario.dataReferencia, order: .reverse) private var pontos: [PontoDiario]
 
     @State private var viewModel = DashboardViewModel()
-
-    private var empresaSelecionada: Empresa? {
-        viewModel.empresaSelecionada
-    }
 
     init() {}
 
@@ -23,7 +20,6 @@ struct DashboardView: View {
                     if !viewModel.hasEmpresas {
                         emptyState
                     } else {
-                        seletorEmpresa
                         resumoDia
                         gradePonto
                     }
@@ -31,6 +27,11 @@ struct DashboardView: View {
                 .padding()
             }
             .navigationTitle("Ronin")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    PrivacyToolbarButton()
+                }
+            }
             .sheet(isPresented: Binding(
                 get: { viewModel.isShowingEmpresaSheet },
                 set: { viewModel.isShowingEmpresaSheet = $0 }
@@ -45,7 +46,19 @@ struct DashboardView: View {
 
     private var snapshotKey: String {
         let empresasKey = empresas.map { "\($0.id.uuidString)-\($0.nome)-\($0.valorHoraAtual)" }.joined(separator: "|")
-        let pontosKey = pontos.map { "\($0.id.uuidString)-\($0.dataReferencia.timeIntervalSince1970)-\($0.totalHorasTrabalhadas)" }.joined(separator: "|")
+        let pontosKey = pontos.map {
+            [
+                $0.id.uuidString,
+                String($0.dataReferencia.timeIntervalSince1970),
+                String($0.entrada?.timeIntervalSince1970 ?? 0),
+                String($0.idaAlmoco?.timeIntervalSince1970 ?? 0),
+                String($0.voltaAlmoco?.timeIntervalSince1970 ?? 0),
+                String($0.fimExpediente?.timeIntervalSince1970 ?? 0),
+                $0.status.rawValue,
+                String($0.totalHorasTrabalhadas),
+                String($0.valorHoraAplicado)
+            ].joined(separator: "-")
+        }.joined(separator: "|")
         return "\(empresasKey)#\(pontosKey)"
     }
 
@@ -54,7 +67,7 @@ struct DashboardView: View {
             Text("Valor a Receber no Mês")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text(viewModel.totalMesAtualText)
+            Text(PrivacyMode.display(viewModel.totalMesAtualText, isEnabled: isPrivacyEnabled))
                 .font(.system(size: 34, weight: .bold, design: .rounded))
             Text("Soma de todas as horas registradas no mês atual.")
                 .font(.footnote)
@@ -85,34 +98,6 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-    }
-
-    private var seletorEmpresa: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Empresa do dia")
-                .font(.headline)
-
-            Picker("Empresa", selection: Binding(
-                get: { viewModel.selectedEmpresaID },
-                set: { viewModel.selecionarEmpresa(id: $0) }
-            )) {
-                ForEach(viewModel.empresaOptions) { empresa in
-                    Text(empresa.nome).tag(empresa.id)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if let valorHoraSelecionadoText = viewModel.valorHoraSelecionadoText {
-                Text("Valor/hora atual: \(valorHoraSelecionadoText)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var resumoDia: some View {

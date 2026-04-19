@@ -33,6 +33,15 @@ final class EmpresaFormViewModel {
         return nomeValido && valorHora > 0
     }
 
+    func formValido(valorHoraText: String) -> Bool {
+        let nomeValido = isEditMode || !nome.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return nomeValido && RoninFormatters.isValidCurrencyInput(valorHoraText) && valorHora > 0
+    }
+
+    func valorHoraMensagemErro(_ valorHoraText: String) -> String? {
+        RoninFormatters.currencyValidationMessage(valorHoraText)
+    }
+
     func salvar(using modelContext: ModelContext) throws {
         switch mode {
         case .create:

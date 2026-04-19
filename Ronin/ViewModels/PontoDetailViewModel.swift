@@ -11,8 +11,12 @@ enum PontoHorarioField {
 
 @Observable
 final class PontoDetailViewModel {
-    let ponto: PontoDiario
+    private let service = PontoTrackingService()
 
+    let ponto: PontoDiario
+    let isNew: Bool
+
+    var draftDataReferencia: Date
     var draftEntrada: Date
     var draftIdaAlmoco: Date
     var draftVoltaAlmoco: Date
@@ -24,8 +28,10 @@ final class PontoDetailViewModel {
 
     init(ponto: PontoDiario) {
         self.ponto = ponto
+        isNew = ponto.modelContext == nil
 
         let baseDate = ponto.dataReferencia
+        draftDataReferencia = baseDate
         draftEntrada = ponto.entrada ?? baseDate
         draftIdaAlmoco = ponto.idaAlmoco ?? baseDate
         draftVoltaAlmoco = ponto.voltaAlmoco ?? baseDate
@@ -37,7 +43,11 @@ final class PontoDetailViewModel {
     }
 
     var dataFormatada: String {
-        ponto.dataReferencia.formatted(.dateTime.day().month(.wide).year())
+        draftDataReferencia.formatted(.dateTime.day().month(.wide).year())
+    }
+
+    var navigationTitle: String {
+        isNew ? "Novo Registro Manual" : "Detalhe do Dia"
     }
 
     var nomeEmpresa: String {
@@ -71,10 +81,24 @@ final class PontoDetailViewModel {
     }
 
     func salvar(using modelContext: ModelContext) throws {
+        let dataReferencia = Calendar.current.startOfDay(for: draftDataReferencia)
+        let pontosExistentes = try modelContext.fetch(FetchDescriptor<PontoDiario>())
+
+        guard !service.hasRegistro(on: dataReferencia, in: pontosExistentes, excluding: ponto.id) else {
+            throw PontoTrackingError.duplicateDayRecord
+        }
+
+        try validateChronologicalOrder()
+
+        ponto.dataReferencia = dataReferencia
         ponto.entrada = hasEntrada ? draftEntrada : nil
         ponto.idaAlmoco = hasIdaAlmoco ? draftIdaAlmoco : nil
         ponto.voltaAlmoco = hasVoltaAlmoco ? draftVoltaAlmoco : nil
         ponto.fimExpediente = hasFimExpediente ? draftFimExpediente : nil
+
+        if ponto.modelContext == nil {
+            modelContext.insert(ponto)
+        }
 
         try modelContext.save()
     }
@@ -102,6 +126,49 @@ final class PontoDetailViewModel {
             draftVoltaAlmoco = date
         case .fimExpediente:
             draftFimExpediente = date
+        }
+    }
+
+    private func validateChronologicalOrder() throws {
+        let entrada = hasEntrada ? draftEntrada : nil
+        let idaAlmoco = hasIdaAlmoco ? draftIdaAlmoco : nil
+        let voltaAlmoco = hasVoltaAlmoco ? draftVoltaAlmoco : nil
+        let fimExpediente = hasFimExpediente ? draftFimExpediente : nil
+
+        if idaAlmoco != nil && entrada == nil {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "A ida para almoço não pode existir sem o primeiro ponto de entrada.")
+        }
+
+        if voltaAlmoco != nil && idaAlmoco == nil {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "A volta do almoço não pode existir sem a ida para almoço.")
+        }
+
+        if fimExpediente != nil && entrada == nil {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O fim do expediente não pode existir sem o primeiro ponto de entrada.")
+        }
+
+        if let entrada, let idaAlmoco, idaAlmoco < entrada {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O segundo ponto não pode ser antes do primeiro ponto.")
+        }
+
+        if let idaAlmoco, let voltaAlmoco, voltaAlmoco < idaAlmoco {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O terceiro ponto não pode ser antes do segundo ponto.")
+        }
+
+        if let entrada, let voltaAlmoco, voltaAlmoco < entrada {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O terceiro ponto não pode ser antes do primeiro ponto.")
+        }
+
+        if let entrada, let fimExpediente, fimExpediente < entrada {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O quarto ponto não pode ser antes do primeiro ponto.")
+        }
+
+        if let idaAlmoco, let fimExpediente, fimExpediente < idaAlmoco {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O quarto ponto não pode ser antes do segundo ponto.")
+        }
+
+        if let voltaAlmoco, let fimExpediente, fimExpediente < voltaAlmoco {
+            throw PontoTrackingError.invalidChronologicalOrder(message: "O quarto ponto não pode ser antes do terceiro ponto.")
         }
     }
 }

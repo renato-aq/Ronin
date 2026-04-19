@@ -2,11 +2,6 @@ import Foundation
 import Observation
 import SwiftData
 
-struct DashboardEmpresaOption: Identifiable, Equatable {
-    let id: String
-    let nome: String
-}
-
 struct DashboardResumoDia {
     let status: String
     let empresa: String
@@ -32,10 +27,7 @@ final class DashboardViewModel {
     private(set) var empresas: [Empresa] = []
     private(set) var pontos: [PontoDiario] = []
 
-    var empresaOptions: [DashboardEmpresaOption] = []
-    var selectedEmpresaID = ""
     var totalMesAtualText = 0.0.formatted(RoninFormatters.currencyBRL)
-    var valorHoraSelecionadoText: String?
     var resumoDia: DashboardResumoDia?
     var actionCards: [DashboardActionCard] = []
     var hasEmpresas = false
@@ -45,31 +37,14 @@ final class DashboardViewModel {
         self.empresas = empresas
         self.pontos = pontos
 
-        if empresaSelecionada == nil, let first = empresas.first {
-            selectedEmpresaID = first.id.uuidString
-        }
-
         hasEmpresas = !empresas.isEmpty
-        empresaOptions = empresas.map { DashboardEmpresaOption(id: $0.id.uuidString, nome: $0.nome) }
         totalMesAtualText = service.totalMesAtual(from: pontos).formatted(RoninFormatters.currencyBRL)
-
-        if let empresaSelecionada {
-            valorHoraSelecionadoText = empresaSelecionada.valorHoraAtual.formatted(RoninFormatters.currencyBRL)
-        } else {
-            valorHoraSelecionadoText = nil
-        }
-
         resumoDia = buildResumoDia()
         actionCards = buildActionCards()
     }
 
     var empresaSelecionada: Empresa? {
-        empresas.first { $0.id.uuidString == selectedEmpresaID } ?? empresas.first
-    }
-
-    func selecionarEmpresa(id: String) {
-        selectedEmpresaID = id
-        update(empresas: empresas, pontos: pontos)
+        empresas.first
     }
 
     func abrirCriacaoEmpresa() {
@@ -81,12 +56,21 @@ final class DashboardViewModel {
     }
 
     func registrar(evento: PontoEvento, modelContext: ModelContext) throws {
-        try service.registrar(
+        let pontoAtualizado = try service.registrar(
             evento: evento,
             empresa: empresaSelecionada,
             pontos: pontos,
             modelContext: modelContext
         )
+
+        var pontosAtualizados = pontos
+        if let index = pontosAtualizados.firstIndex(where: { $0.id == pontoAtualizado.id }) {
+            pontosAtualizados[index] = pontoAtualizado
+        } else {
+            pontosAtualizados.insert(pontoAtualizado, at: 0)
+        }
+
+        update(empresas: empresas, pontos: pontosAtualizados)
     }
 
     private func buildResumoDia() -> DashboardResumoDia? {

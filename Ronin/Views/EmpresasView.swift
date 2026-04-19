@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct EmpresasView: View {
+    @AppStorage(PrivacyMode.appStorageKey) private var isPrivacyEnabled = false
     @Query(sort: \Empresa.nome) private var empresas: [Empresa]
     @State private var viewModel = EmpresasViewModel()
 
@@ -9,36 +10,54 @@ struct EmpresasView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(viewModel.rows) { row in
-                    Button {
-                        viewModel.editar(row.empresa)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(row.nome)
-                                    .font(.headline)
-                                Text("Criada em \(row.criadaEm)")
-                                    .font(.footnote)
+            Group {
+                if viewModel.hasEmpresa, let row = viewModel.rows.first {
+                    List {
+                        Button {
+                            viewModel.editar(row.empresa)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(row.nome)
+                                        .font(.headline)
+                                    Text("Criada em \(row.criadaEm)")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(PrivacyMode.display(row.valorHora, isEnabled: isPrivacyEnabled))
+                                    .fontWeight(.semibold)
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Text(row.valorHora)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                } else {
+                    ContentUnavailableView {
+                        Label("Cadastre sua empresa", systemImage: "building.2.crop.circle")
+                    } description: {
+                        Text("Nesta primeira versão do app, você gerencia uma única empresa.")
+                    } actions: {
+                        Button("Cadastrar Empresa") {
+                            viewModel.abrirCriacao()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
             }
-            .navigationTitle("Empresas")
+            .navigationTitle("Empresa")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.abrirCriacao()
-                    } label: {
-                        Label("Nova Empresa", systemImage: "plus")
+                ToolbarItem(placement: .topBarLeading) {
+                    PrivacyToolbarButton()
+                }
+                if !viewModel.hasEmpresa {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            viewModel.abrirCriacao()
+                        } label: {
+                            Label("Nova Empresa", systemImage: "plus")
+                        }
                     }
                 }
             }

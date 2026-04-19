@@ -10,6 +10,7 @@ struct HistoricoRowData: Identifiable {
     let empresa: String
     let horas: String
     let valor: String
+    let isIncomplete: Bool
 }
 
 struct HistoricoSection: Identifiable {
@@ -44,7 +45,8 @@ final class HistoricoViewModel {
                         status: ponto.status.titulo,
                         empresa: ponto.nomeEmpresaSnapshot.isEmpty ? "Sem empresa" : ponto.nomeEmpresaSnapshot,
                         horas: RoninFormatters.horas(ponto.totalHorasTrabalhadas),
-                        valor: ponto.valorFaturadoDia.formatted(RoninFormatters.currencyBRL)
+                        valor: ponto.valorFaturadoDia.formatted(RoninFormatters.currencyBRL),
+                        isIncomplete: ponto.status != .completo
                     )
                 }
             )

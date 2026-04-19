@@ -2,9 +2,12 @@ import SwiftData
 import SwiftUI
 
 struct HistoricoView: View {
+    @AppStorage(PrivacyMode.appStorageKey) private var isPrivacyEnabled = false
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Empresa.nome) private var empresas: [Empresa]
     @Query(sort: \PontoDiario.dataReferencia, order: .reverse) private var pontos: [PontoDiario]
     @State private var viewModel = HistoricoViewModel()
+    @State private var pontoManual: PontoDiario?
 
     init() {}
 
@@ -31,6 +34,24 @@ struct HistoricoView: View {
                 }
             }
             .navigationTitle("Histórico")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        pontoManual = PontoDiario(
+                            dataReferencia: Calendar.current.startOfDay(for: .now),
+                            empresaID: empresas.first?.id,
+                            nomeEmpresaSnapshot: empresas.first?.nome ?? "",
+                            valorHoraAplicado: empresas.first?.valorHoraAtual ?? 0
+                        )
+                    } label: {
+                        Label("Adicionar", systemImage: "plus")
+                    }
+                    .disabled(empresas.isEmpty)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    PrivacyToolbarButton()
+                }
+            }
             .task(id: snapshotKey) {
                 viewModel.update(pontos: pontos)
             }
@@ -60,6 +81,11 @@ struct HistoricoView: View {
             } message: {
                 Text("Essa ação remove permanentemente o registro do histórico.")
             }
+            .sheet(item: $pontoManual) { ponto in
+                NavigationStack {
+                    PontoDetailView(ponto: ponto)
+                }
+            }
         }
     }
 
@@ -69,6 +95,7 @@ struct HistoricoView: View {
 }
 
 private struct HistoricoRowView: View {
+    @AppStorage(PrivacyMode.appStorageKey) private var isPrivacyEnabled = false
     let row: HistoricoRowData
 
     var body: some View {
@@ -88,11 +115,21 @@ private struct HistoricoRowView: View {
             HStack {
                 Text(row.horas)
                 Spacer()
-                Text(row.valor)
+                Text(PrivacyMode.display(row.valor, isEnabled: isPrivacyEnabled))
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(row.isIncomplete ? Color.yellow.opacity(0.08) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(row.isIncomplete ? Color.yellow.opacity(0.9) : Color.clear, lineWidth: 1.5)
+        )
     }
 }
